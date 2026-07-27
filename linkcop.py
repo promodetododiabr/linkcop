@@ -4,28 +4,122 @@ import os
 import tempfile
 import re
 import time
-import requests
-import zipfile
-import signal
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
-st.set_page_config(page_title="Downloader Universal", page_icon="🎵", layout="centered")
+# Configuração da página
+st.set_page_config(
+    page_title="InstaSave Pro",
+    page_icon="📸",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
 
-# ============ VALIDAÇÃO ============
+# CSS personalizado para estilo Instagram
+st.markdown("""
+<style>
+    /* Fundo gradiente */
+    .stApp {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f09433 100%);
+        min-height: 100vh;
+    }
+    
+    /* Container principal */
+    .main-container {
+        background: white;
+        border-radius: 20px;
+        padding: 40px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        margin: 40px auto;
+        max-width: 600px;
+    }
+    
+    /* Título principal */
+    .main-title {
+        font-size: 3em;
+        font-weight: bold;
+        background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-align: center;
+        margin-bottom: 10px;
+        animation: gradient 3s ease infinite;
+    }
+    
+    @keyframes gradient {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+    
+    /* Subtítulo */
+    .subtitle {
+        text-align: center;
+        color: #666;
+        font-size: 1.1em;
+        margin-bottom: 30px;
+    }
+    
+    /* Botão estilizado */
+    .stButton > button {
+        background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+        color: white;
+        border: none;
+        border-radius: 50px;
+        padding: 15px 40px;
+        font-size: 1.2em;
+        font-weight: bold;
+        cursor: pointer;
+        transition: transform 0.3s, box-shadow 0.3s;
+        width: 100%;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 30px rgba(220, 39, 67, 0.4);
+    }
+    
+    /* Campo de input */
+    .stTextInput > div > input {
+        border-radius: 15px;
+        border: 2px solid #e0e0e0;
+        padding: 15px;
+        font-size: 1em;
+        transition: border-color 0.3s;
+    }
+    
+    .stTextInput > div > input:focus {
+        border-color: #dc2743;
+    }
+    
+    /* Cards de sucesso */
+    .success-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 15px;
+        margin: 20px 0;
+        text-align: center;
+    }
+    
+    /* Ícones */
+    .icon {
+        font-size: 4em;
+        text-align: center;
+        margin-bottom: 20px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Função para validar link
 def validar_instagram(url):
-    return re.match(r'https?://(www\.)?instagram\.com/(p|reel|reels|tv)/[A-Za-z0-9_-]+', url) is not None
+    padrao = r'https?://(www\.)?instagram\.com/(p|reel|reels|tv|stories)/[A-Za-z0-9_-]+'
+    return re.match(padrao, url) is not None
 
-def validar_youtube(url):
-    return "youtube.com" in url or "youtu.be" in url
-
-def eh_playlist(url):
-    return "list=" in url or "/playlist" in url
-
-# ============ INSTAGRAM ============
+# Função para baixar
 def baixar_instagram(url):
     pasta_temp = tempfile.mkdtemp()
     ydl_opts = {
-        'outtmpl': os.path.join(pasta_temp, '%(id)s.%(ext)s'),
+        'outtmpl': os.path.join(pasta_temp, '%(title)s.%(ext)s'),
         'format': 'best',
         'noplaylist': True,
         'quiet': True,
@@ -33,213 +127,142 @@ def baixar_instagram(url):
         'username': st.secrets.get("INSTAGRAM_USER", ""),
         'password': st.secrets.get("INSTAGRAM_PASS", ""),
     }
+    
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
-            return filename, info.get('title', 'video')
+            return filename, info.get('title', 'video'), info
     except Exception as e:
-        return None, str(e)
+        return None, str(e), None
 
-# ============ YOUTUBE VIA API (RÁPIDO, SEM BLOQUEIO) ============
-def baixar_youtube_api(url, qualidade="720", apenas_audio=False):
-    """API pública que não sofre bloqueio do YouTube"""
-    try:
-        # Usando API do cobalt (funciona bem)
-        api_url = "https://api.cobalt.tools/api/json"
-        
-        payload = {
-            "url": url,
-            "vCodec": "h264",
-            "vQuality": qualidade if not apenas_audio else "720",
-            "aFormat": "mp3",
-            "isAudioOnly": apenas_audio,
-            "filenamePattern": "basic"
-        }
-        
-        headers = {
-            "Accept": "application/json",
-            "Content-Type": "application/json"
-        }
-        
-        response = requests.post(api_url, json=payload, headers=headers, timeout=30)
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            if data.get("status") in ["stream", "redirect", "tunnel"]:
-                file_url = data.get("url")
-                
-                if file_url:
-                    pasta_temp = tempfile.mkdtemp()
-                    ext = "mp3" if apenas_audio else "mp4"
-                    arquivo_path = os.path.join(pasta_temp, f"video.{ext}")
-                    
-                    # Baixa o arquivo
-                    file_response = requests.get(file_url, timeout=120)
-                    with open(arquivo_path, 'wb') as f:
-                        f.write(file_response.content)
-                    
-                    return arquivo_path, "download_sucesso"
-        
-        return None, "API não retornou dados válidos"
-        
-    except Exception as e:
-        return None, f"Erro API: {str(e)}"
+# Interface principal
+st.markdown('<div class="main-container">', unsafe_allow_html=True)
 
-# ============ YOUTUBE VIA YT-DLP (COM TIMEOUT) ============
-def baixar_youtube_ytdlp(url, qualidade="720", apenas_audio=False, timeout=60):
-    """yt-dlp com timeout para não travar"""
-    pasta_temp = tempfile.mkdtemp()
-    
-    if apenas_audio:
-        format_str = 'bestaudio/best'
-        ext = 'mp3'
-    elif qualidade == "1080p":
-        format_str = 'bestvideo[height<=1080]+bestaudio/best[height<=1080]'
-        ext = 'mp4'
-    elif qualidade == "720p":
-        format_str = 'bestvideo[height<=720]+bestaudio/best[height<=720]'
-        ext = 'mp4'
-    elif qualidade == "480p":
-        format_str = 'bestvideo[height<=480]+bestaudio/best[height<=480]'
-        ext = 'mp4'
-    else:
-        format_str = 'best'
-        ext = 'mp4'
-    
-    ydl_opts = {
-        'outtmpl': os.path.join(pasta_temp, '%(title)s.' + ext),
-        'format': format_str,
-        'quiet': True,
-        'no_warnings': True,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'referer': 'https://www.youtube.com/',
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['web', 'web_creator', 'ios', 'android'],
-                'player_skip': ['webpage', 'configs']
-            }
-        },
-        'nocheckcertificate': True,
-        'retries': 2,
-        'fragment_retries': 2,
-    }
-    
-    def download():
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
-            return filename, info.get('title', 'vídeo')
-    
-    try:
-        with ThreadPoolExecutor() as executor:
-            future = executor.submit(download)
-            resultado = future.result(timeout=timeout)
-            return resultado[0], resultado[1]
-    except TimeoutError:
-        return None, "Timeout: download demorou muito"
-    except Exception as e:
-        return None, str(e)
+# Título estiloso
+st.markdown('<div class="icon">📸</div>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-title">InstaSave Pro</h1>', unsafe_allow_html=True)
+st.markdown('<p class="subtitle">Baixe vídeos, reels e fotos do Instagram<br>de forma rápida e gratuita</p>', unsafe_allow_html=True)
 
-# ============ CRIAR ZIP ============
-def criar_zip(pasta_origem, nome_zip):
-    zip_path = os.path.join(tempfile.mkdtemp(), nome_zip)
-    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        for root, dirs, files in os.walk(pasta_origem):
-            for file in files:
-                file_path = os.path.join(root, file)
-                arcname = os.path.relpath(file_path, pasta_origem)
-                zipf.write(file_path, arcname)
-    return zip_path
+st.markdown("---")
 
-# ============ INTERFACE ============
-st.title("🎵 Downloader Universal")
-st.markdown("Baixe vídeos e músicas de **Instagram** e **YouTube** ⚡")
-
-plataforma = st.selectbox(
-    "📱 Escolha a plataforma:",
-    ["🎬 Instagram", " YouTube"]
+# Campo de URL
+url = st.text_input(
+    "",
+    placeholder="🔗 Cole o link do Instagram aqui...",
+    label_visibility="collapsed"
 )
 
-url = st.text_input("🔗 Cole o link aqui:", placeholder="https://...")
-
-if "YouTube" in plataforma:
-    qualidade = st.selectbox(
-        " Qualidade:",
-        ["1080p", "720p", "480p", "360p", "Apenas MP3 (Áudio)"]
-    )
-    apenas_audio = qualidade == "Apenas MP3 (Áudio)"
-    qualidade_num = qualidade.replace("p", "").replace(" (Áudio)", "") if not apenas_audio else "720"
-else:
-    qualidade = "Melhor"
-    apenas_audio = False
-    qualidade_num = "720"
-
-if st.button("️ BAIXAR", type="primary", use_container_width=True):
+# Botão de download
+if st.button("️ BAIXAR AGORA", use_container_width=True):
     if not url:
-        st.warning("⚠️ Cole um link!")
+        st.error("⚠️ Por favor, cole um link do Instagram!")
+    elif not validar_instagram(url):
+        st.error("❌ Link inválido! Use links de posts, reels ou stories.")
     else:
-        inicio = time.time()
-        
-        if "Instagram" in plataforma:
-            if not validar_instagram(url):
-                st.error("❌ Link inválido!")
-                st.stop()
-            
-            with st.spinner("🔄 Baixando do Instagram..."):
-                arquivo, info = baixar_instagram(url)
-            
-            if arquivo and os.path.exists(arquivo):
-                tempo_total = round(time.time() - inicio, 1)
-                tamanho_mb = round(os.path.getsize(arquivo) / (1024 * 1024), 2)
-                st.success(f"✅ Concluído em {tempo_total}s! ({tamanho_mb} MB)")
-                
-                with open(arquivo, "rb") as f:
-                    st.download_button(
-                        label="💾 Salvar vídeo",
-                        data=f,
-                        file_name=f"{info}.mp4",
-                        mime="video/mp4",
-                        use_container_width=True
-                    )
-            else:
-                st.error(f"❌ Erro: {info}")
-                
-        elif "YouTube" in plataforma:
-            if not validar_youtube(url):
-                st.error("❌ Link inválido!")
-                st.stop()
-            
-            # Tenta API primeiro (mais rápido)
-            with st.spinner(" Tentando método rápido..."):
-                arquivo, info = baixar_youtube_api(url, qualidade_num, apenas_audio)
-            
-            # Se API falhar, tenta yt-dlp com timeout
-            if not arquivo:
-                with st.spinner(" Método rápido falhou. Tentando alternativo (pode demorar)..."):
-                    arquivo, info = baixar_youtube_ytdlp(url, qualidade_num, apenas_audio, timeout=45)
-            
+        with st.spinner(" Processando..."):
+            inicio = time.time()
+            arquivo, info, dados = baixar_instagram(url)
             tempo_total = round(time.time() - inicio, 1)
             
             if arquivo and os.path.exists(arquivo):
                 tamanho_mb = round(os.path.getsize(arquivo) / (1024 * 1024), 2)
-                st.success(f"✅ Concluído em {tempo_total}s! ({tamanho_mb} MB)")
                 
-                ext = ".mp3" if apenas_audio else ".mp4"
-                mime = "audio/mpeg" if ext == ".mp3" else "video/mp4"
+                st.markdown(f"""
+                <div class="success-card">
+                    <h2>✅ Download Concluído!</h2>
+                    <p>Tempo: {tempo_total}s | Tamanho: {tamanho_mb} MB</p>
+                </div>
+                """, unsafe_allow_html=True)
                 
+                st.info(f"📄 **Arquivo:** {info}")
+                
+                # Determina tipo de arquivo
+                if arquivo.endswith('.mp4'):
+                    mime_type = "video/mp4"
+                    emoji = ""
+                elif arquivo.endswith('.jpg'):
+                    mime_type = "image/jpeg"
+                    emoji = "📷"
+                else:
+                    mime_type = "video/mp4"
+                    emoji = "📹"
+                
+                # Botão de download estilizado
                 with open(arquivo, "rb") as f:
                     st.download_button(
-                        label="💾 Salvar arquivo",
+                        label=f"{emoji} BAIXAR ARQUIVO",
                         data=f,
-                        file_name=f"download{ext}",
-                        mime=mime,
-                        use_container_width=True
+                        file_name=os.path.basename(arquivo),
+                        mime=mime_type,
+                        use_container_width=True,
+                        type="primary"
                     )
+                
+                # Botão para abrir pasta
+                if st.button("📁 Abrir Local", use_container_width=True):
+                    st.info(f"Arquivo salvo em: {os.path.dirname(arquivo)}")
             else:
-                st.error(f"❌ Erro: {info}")
-                st.info(" **Soluções:**\n- Tente outro link\n- Aguarde alguns minutos e tente novamente\n- O vídeo pode ser privado ou ter restrição")
+                st.error(f"❌ Erro no download: {info}")
+                st.info("💡 **Dicas:**\n- Verifique se o link está correto\n- O post pode ser privado\n- Tente novamente em alguns minutos")
 
 st.markdown("---")
-st.caption("⚠️ Use apenas para conteúdos permitidos. Respeite direitos autorais.")
+
+# Recursos
+st.markdown("""
+<div style="text-align: center; margin-top: 30px;">
+    <h3 style="color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">✨ Recursos</h3>
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-top: 20px;">
+        <div style="background: white; padding: 15px; border-radius: 10px;">
+            <div style="font-size: 2em;">🎬</div>
+            <div style="color: #333; font-weight: bold;">Reels</div>
+        </div>
+        <div style="background: white; padding: 15px; border-radius: 10px;">
+            <div style="font-size: 2em;">📷</div>
+            <div style="color: #333; font-weight: bold;">Fotos</div>
+        </div>
+        <div style="background: white; padding: 15px; border-radius: 10px;">
+            <div style="font-size: 2em;"></div>
+            <div style="color: #333; font-weight: bold;">Vídeos</div>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# Rodapé
+st.markdown("""
+<div style="text-align: center; margin-top: 30px; color: white; font-size: 0.9em;">
+    <p>⚠️ Use apenas para conteúdos que você tem permissão</p>
+    <p style="margin-top: 10px; font-size: 0.8em;">
+        Feito com ❤️ | InstaSave Pro © 2026
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+# Sidebar com informações
+with st.sidebar:
+    st.markdown("""
+    <div style="text-align: center;">
+        <h2>ℹ️ Como Usar</h2>
+        <ol style="text-align: left; line-height: 2;">
+            <li>Abra o Instagram</li>
+            <li>Copie o link do post/reel</li>
+            <li>Cole no campo acima</li>
+            <li>Clique em "Baixar Agora"</li>
+            <li>Salve o arquivo!</li>
+        </ol>
+        
+        <div style="margin-top: 30px; padding: 20px; background: #f0f0f0; border-radius: 10px;">
+            <h3>📱 Tipos Suportados</h3>
+            <ul style="text-align: left;">
+                <li>✅ Posts com vídeo</li>
+                <li>✅ Reels</li>
+                <li>✅ IGTV</li>
+                <li>✅ Stories (se público)</li>
+                <li>✅ Fotos</li>
+            </ul>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
