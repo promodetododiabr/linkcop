@@ -6,10 +6,9 @@ import re
 import subprocess
 import time
 import requests
-import json
 
 # Configuração da página
-st.set_page_config(page_title="Downloader Universal", page_icon="", layout="centered")
+st.set_page_config(page_title="Downloader Universal", page_icon="🎵", layout="centered")
 
 # ============ FUNÇÕES DE VALIDAÇÃO ============
 def validar_link_instagram(url):
@@ -21,9 +20,8 @@ def validar_link_youtube(url):
 def validar_link_spotify(url):
     return "open.spotify.com" in url
 
-# ============ DOWNLOAD YOUTUBE - MÉTODO 1: API YTMP3 ============
+# ============ DOWNLOAD YOUTUBE ============
 def baixar_youtube_api_ytmp3(url, apenas_audio=False):
-    """API alternativa 1"""
     try:
         if apenas_audio:
             api_url = f"https://yt1s.com/api/ajaxSearch/index?vid={url}&q=mp3"
@@ -39,7 +37,6 @@ def baixar_youtube_api_ytmp3(url, apenas_audio=False):
         data = response.json()
         
         if data.get("status") == "ok":
-            # Pega o link de download
             if apenas_audio:
                 links = data.get("links", {})
                 mp3_links = links.get("mp3", {})
@@ -71,9 +68,7 @@ def baixar_youtube_api_ytmp3(url, apenas_audio=False):
     except Exception as e:
         return None, str(e)
 
-# ============ DOWNLOAD YOUTUBE - MÉTODO 2: YT-DLP OTIMIZADO ============
 def baixar_youtube_ytdlp(url, qualidade="720", apenas_audio=False):
-    """Fallback usando yt-dlp com configurações anti-bloqueio"""
     try:
         pasta_temp = tempfile.mkdtemp()
         
@@ -100,7 +95,6 @@ def baixar_youtube_ytdlp(url, qualidade="720", apenas_audio=False):
             'no_warnings': True,
             'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'referer': 'https://www.youtube.com/',
-            # Configurações anti-bloqueio
             'extractor_args': {
                 'youtube': {
                     'player_client': ['web', 'web_creator', 'ios', 'android'],
@@ -143,9 +137,14 @@ def baixar_instagram(url):
     except Exception as e:
         return None, str(e)
 
-# ============ DOWNLOAD SPOTIFY ============
+# ============ DOWNLOAD SPOTIFY (COM VERIFICAÇÃO) ============
 def baixar_spotify(url, pasta_temp):
     try:
+        # Verifica se o spotdl está disponível
+        result = subprocess.run(['which', 'spotdl'], capture_output=True, text=True)
+        if result.returncode != 0:
+            return None, "SpotDL não está instalado no servidor. Tente YouTube ou Instagram."
+        
         process = subprocess.Popen(
             ['spotdl', url, '--output', pasta_temp, '--format', 'mp3', 
              '--bitrate', '320', '--threads', '4'],
@@ -153,7 +152,7 @@ def baixar_spotify(url, pasta_temp):
             stderr=subprocess.PIPE,
             cwd=pasta_temp
         )
-        stdout, stderr = process.communicate()
+        stdout, stderr = process.communicate(timeout=300)
         
         if process.returncode == 0:
             arquivos = [f for f in os.listdir(pasta_temp) if f.endswith('.mp3')]
@@ -161,7 +160,14 @@ def baixar_spotify(url, pasta_temp):
                 arquivo_path = os.path.join(pasta_temp, arquivos[0])
                 return arquivo_path, arquivos[0]
         
-        return None, stderr.decode('utf-8') if stderr else "Erro desconhecido"
+        erro_msg = stderr.decode('utf-8') if stderr else "Erro desconhecido"
+        if "pkg_resources" in erro_msg:
+            return None, "Erro de instalação do SpotDL. Admin: adicione 'setuptools' ao requirements.txt"
+        
+        return None, erro_msg
+        
+    except subprocess.TimeoutExpired:
+        return None, "Download do Spotify demorou muito. Tente uma música individual em vez de playlist."
     except Exception as e:
         return None, str(e)
 
@@ -172,7 +178,7 @@ st.markdown("Baixe vídeos e músicas de **Instagram**, **YouTube** e **Spotify*
 # Menu de seleção
 plataforma = st.selectbox(
     "📱 Escolha a plataforma:",
-    ["🎬 Instagram", "📺 YouTube", "🎵 Spotify"]
+    ["🎬 Instagram", " YouTube", "🎵 Spotify"]
 )
 
 # Campo de URL
@@ -181,7 +187,7 @@ url = st.text_input("🔗 Cole o link aqui:", placeholder="https://...")
 # Opções para YouTube
 if "YouTube" in plataforma:
     qualidade = st.selectbox(
-        " Qualidade do vídeo:",
+        "📺 Qualidade do vídeo:",
         ["1080p", "720p", "480p", "360p", "Apenas áudio (MP3)"]
     )
     apenas_audio = qualidade == "Apenas áudio (MP3)"
@@ -217,11 +223,9 @@ if st.button("⬇️ BAIXAR", type="primary", use_container_width=True):
                     st.error("❌ Link inválido do YouTube!")
                     st.stop()
                 
-                # Tenta API primeiro (mais rápido)
                 st.info("🔄 Tentando API rápida...")
                 arquivo, info = baixar_youtube_api_ytmp3(url, apenas_audio)
                 
-                # Se API falhar, tenta yt-dlp
                 if not arquivo:
                     st.info("🔄 API indisponível, tentando método alternativo...")
                     arquivo, info = baixar_youtube_ytdlp(url, qualidade_num, apenas_audio)
@@ -233,6 +237,8 @@ if st.button("⬇️ BAIXAR", type="primary", use_container_width=True):
                 if not validar_link_spotify(url):
                     st.error("❌ Link inválido do Spotify!")
                     st.stop()
+                
+                st.info("🎵 Processando com SpotDL...")
                 arquivo, info = baixar_spotify(url, pasta_temp)
                 if arquivo:
                     titulo = info
@@ -262,7 +268,9 @@ if st.button("⬇️ BAIXAR", type="primary", use_container_width=True):
                     )
             else:
                 st.error(f"❌ Erro no download: {info}")
-                st.info("💡 **Dica:** O vídeo pode ser privado, ter restrição de idade ou estar indisponível.")
+                if "pkg_resources" in str(info):
+                    st.error("🔧 **Problema técnico:** O administrador precisa adicionar `setuptools` ao requirements.txt")
+                    st.code("streamlit\nyt-dlp\nspotdl\nsetuptools")
 
 # Rodapé
 st.markdown("---")
