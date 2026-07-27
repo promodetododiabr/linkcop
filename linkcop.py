@@ -13,15 +13,16 @@ def validar_link(url):
     return re.match(padrao, url) is not None
 
 # Função para baixar o vídeo
-def baixar_video(url, pasta_temp, navegador):
+def baixar_video(url, pasta_temp):
     ydl_opts = {
         'outtmpl': os.path.join(pasta_temp, '%(id)s.%(ext)s'),
         'format': 'best',
         'noplaylist': True,
         'quiet': True,
         'no_warnings': True,
-        # O PULO DO GATO: Usa os cookies do seu navegador para não precisar de senha
-        'cookiesfrombrowser': (navegador,), 
+        # Usa o login configurado nos Secrets do Streamlit
+        'username': st.secrets["INSTAGRAM_USER"],
+        'password': st.secrets["INSTAGRAM_PASS"],
     }
     
     try:
@@ -39,11 +40,8 @@ st.markdown("Cole o link e baixe direto. **Sem pedir senha.**")
 # Campo para o link
 url = st.text_input("🔗 Link do Instagram:", placeholder="https://www.instagram.com/reel/...")
 
-# Escolha do navegador (apenas para pegar os cookies de login)
-navegador = st.selectbox(" Qual navegador você usa para acessar o Instagram?", ["chrome", "edge", "firefox", "opera"])
-
 # Botão de Download
-if st.button("️ Baixar Vídeo", type="primary", use_container_width=True):
+if st.button("⬇️ Baixar Vídeo", type="primary", use_container_width=True):
     if not url:
         st.warning("⚠️ Por favor, cole um link primeiro.")
     elif not validar_link(url):
@@ -51,12 +49,12 @@ if st.button("️ Baixar Vídeo", type="primary", use_container_width=True):
     else:
         with st.spinner("🔄 Processando o vídeo..."):
             pasta_temp = tempfile.mkdtemp()
-            arquivo, info = baixar_video(url, pasta_temp, navegador)
+            arquivo, info = baixar_video(url, pasta_temp)
             
             if arquivo and os.path.exists(arquivo):
                 st.success("✅ Vídeo baixado com sucesso!")
                 
-                # Botão para salvar o arquivo no seu PC
+                # Botão para salvar o arquivo
                 with open(arquivo, "rb") as f:
                     st.download_button(
                         label="💾 Clique aqui para salvar o vídeo",
@@ -67,8 +65,7 @@ if st.button("️ Baixar Vídeo", type="primary", use_container_width=True):
                     )
             else:
                 st.error(f"❌ Não foi possível baixar.\n\n**Motivo:** {info}")
-                st.info("💡 **Dica:** Se der erro, **feche o seu navegador** e tente de novo (o app precisa acessar os cookies).")
 
 # Rodapé
 st.markdown("---")
-st.caption("⚠️ Use apenas para baixar conteúdos que você tem permissão. Respeite os direitos autorais.")
+st.caption("️ Use apenas para baixar conteúdos que você tem permissão. Respeite os direitos autorais.")
