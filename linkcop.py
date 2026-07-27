@@ -13,25 +13,26 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# CSS personalizado - corrigido para legibilidade
+# CSS personalizado
 st.markdown("""
 <style>
     /* Fundo gradiente suave */
     .stApp {
-        background: linear-gradient(135deg, #f5f7fa 0%, #e8eaf6 50%, #f3e5f5 100%);
+        background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
         min-height: 100vh;
     }
     
     /* Título principal com gradiente Instagram */
-    h1 {
+    .main-title {
         background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
         text-align: center;
-        font-size: 3em !important;
+        font-size: 3.5em !important;
         font-weight: 800 !important;
         margin-bottom: 10px;
+        letter-spacing: -1px;
     }
     
     /* Subtítulo */
@@ -39,17 +40,45 @@ st.markdown("""
         text-align: center;
         color: #555 !important;
         font-size: 1.2em !important;
-        margin-bottom: 30px;
-        font-weight: 500;
+        margin-bottom: 40px;
+        font-weight: 400;
+        line-height: 1.6;
     }
     
     /* Card principal branco */
     .main-card {
         background: white;
-        border-radius: 20px;
+        border-radius: 24px;
         padding: 40px;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-        margin: 20px auto;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+        margin: 0 auto 40px auto;
+        max-width: 700px;
+    }
+    
+    /* TRUQUE: Esconde a label do text_input mas mantém o input */
+    [data-testid="stTextInput"] label {
+        display: none !important;
+    }
+    
+    /* Campo de input */
+    [data-testid="stTextInput"] input {
+        border-radius: 15px !important;
+        border: 2px solid #e0e0e0 !important;
+        padding: 18px 20px !important;
+        font-size: 1.05em !important;
+        background: #fafafa !important;
+        color: #333 !important;
+        transition: all 0.3s ease;
+    }
+    
+    [data-testid="stTextInput"] input:focus {
+        border-color: #dc2743 !important;
+        background: white !important;
+        box-shadow: 0 0 0 4px rgba(220, 39, 67, 0.1);
+    }
+    
+    [data-testid="stTextInput"] input::placeholder {
+        color: #999 !important;
     }
     
     /* Botão principal estilizado */
@@ -58,43 +87,30 @@ st.markdown("""
         color: white !important;
         border: none;
         border-radius: 50px;
-        padding: 15px 40px;
-        font-size: 1.2em;
+        padding: 18px 40px;
+        font-size: 1.15em;
         font-weight: bold;
         cursor: pointer;
         transition: all 0.3s ease;
         width: 100%;
-        box-shadow: 0 4px 15px rgba(220, 39, 67, 0.3);
+        box-shadow: 0 6px 20px rgba(220, 39, 67, 0.35);
+        letter-spacing: 0.5px;
     }
     
     .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(220, 39, 67, 0.5);
+        transform: translateY(-3px);
+        box-shadow: 0 10px 30px rgba(220, 39, 67, 0.5);
     }
     
-    /* Campo de input */
-    .stTextInput input {
-        border-radius: 15px !important;
-        border: 2px solid #e0e0e0 !important;
-        padding: 15px !important;
-        font-size: 1em !important;
-        background: white !important;
-        color: #333 !important;
-    }
-    
-    .stTextInput input:focus {
-        border-color: #dc2743 !important;
+    .stButton > button:active {
+        transform: translateY(-1px);
     }
     
     /* Alertas e mensagens */
     .stAlert {
         border-radius: 15px !important;
-        padding: 15px !important;
-    }
-    
-    /* Spinner */
-    .stSpinner > div {
-        border-top-color: #dc2743 !important;
+        padding: 15px 20px !important;
+        margin: 15px 0 !important;
     }
     
     /* Download button */
@@ -103,54 +119,73 @@ st.markdown("""
         color: white !important;
         border: none;
         border-radius: 50px;
-        padding: 15px 40px;
-        font-size: 1.1em;
+        padding: 18px 40px;
+        font-size: 1.15em;
         font-weight: bold;
         width: 100%;
-        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.35);
+        transition: all 0.3s ease;
     }
     
     .stDownloadButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+        transform: translateY(-3px);
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.5);
     }
     
     /* Cards de recursos */
     .feature-card {
         background: white;
-        padding: 20px;
-        border-radius: 15px;
+        padding: 30px 20px;
+        border-radius: 20px;
         text-align: center;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-        transition: transform 0.3s;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+        transition: all 0.3s ease;
+        height: 100%;
     }
     
     .feature-card:hover {
-        transform: translateY(-5px);
+        transform: translateY(-8px);
+        box-shadow: 0 12px 30px rgba(0,0,0,0.12);
     }
     
     .feature-icon {
-        font-size: 2.5em;
-        margin-bottom: 10px;
+        font-size: 3em;
+        margin-bottom: 15px;
     }
     
     .feature-title {
         color: #333 !important;
-        font-weight: bold;
-        font-size: 1.1em;
+        font-weight: 700;
+        font-size: 1.15em;
+    }
+    
+    /* Título da seção */
+    .section-title {
+        text-align: center;
+        color: #333 !important;
+        font-size: 1.8em !important;
+        font-weight: 700 !important;
+        margin-bottom: 30px;
     }
     
     /* Rodapé */
     .footer {
         text-align: center;
-        color: #666 !important;
-        margin-top: 30px;
+        color: #888 !important;
+        margin-top: 40px;
         font-size: 0.9em;
+        line-height: 1.8;
     }
     
-    /* Esconder barra lateral vazia */
+    /* Esconder menu e footer padrão do Streamlit */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Spinner */
+    .stSpinner > div {
+        border-top-color: #dc2743 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -181,15 +216,15 @@ def baixar_instagram(url):
         return None, str(e), None
 
 # Interface principal
-st.markdown("<h1> InstaSave Pro</h1>", unsafe_allow_html=True)
+st.markdown('<h1 class="main-title">InstaSave Pro</h1>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">Baixe vídeos, reels e fotos do Instagram<br>de forma rápida e gratuita</p>', unsafe_allow_html=True)
 
 # Card principal
 st.markdown('<div class="main-card">', unsafe_allow_html=True)
 
-# Campo de URL
+# Campo de URL (sem label visível e sem barra branca)
 url = st.text_input(
-    "",
+    "url_input",
     placeholder="🔗 Cole o link do Instagram aqui...",
     label_visibility="collapsed"
 )
@@ -223,7 +258,7 @@ if st.button("⬇️ BAIXAR AGORA", use_container_width=True):
                     label = "BAIXAR FOTO"
                 else:
                     mime_type = "video/mp4"
-                    emoji = "📹"
+                    emoji = ""
                     label = "BAIXAR ARQUIVO"
                 
                 # Botão de download
@@ -242,8 +277,7 @@ if st.button("⬇️ BAIXAR AGORA", use_container_width=True):
 st.markdown('</div>', unsafe_allow_html=True)
 
 # Seção de recursos
-st.markdown("---")
-st.markdown("<h3 style='text-align: center; color: #333;'>✨ O que você pode baixar?</h3>", unsafe_allow_html=True)
+st.markdown("<h2 class='section-title'>✨ O que você pode baixar?</h2>", unsafe_allow_html=True)
 
 col1, col2, col3 = st.columns(3)
 
@@ -275,6 +309,6 @@ with col3:
 st.markdown("""
 <div class="footer">
     <p>⚠️ Use apenas para conteúdos que você tem permissão</p>
-    <p style="margin-top: 10px;">Feito com ❤️ | InstaSave Pro © 2026</p>
+    <p>Feito com ❤️ | InstaSave Pro © 2026</p>
 </div>
 """, unsafe_allow_html=True)
