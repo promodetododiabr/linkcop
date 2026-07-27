@@ -6,14 +6,12 @@ import re
 import subprocess
 import time
 import requests
+import json
 
 # Configuração da página
 st.set_page_config(page_title="Downloader Universal", page_icon="🎵", layout="centered")
 
-# Headers para evitar bloqueio
-USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-
-# Função para validar links
+# ============ FUNÇÕES DE VALIDAÇÃO ============
 def validar_link_instagram(url):
     return re.match(r'https?://(www\.)?instagram\.com/(p|reel|reels|tv)/[A-Za-z0-9_-]+', url) is not None
 
@@ -23,8 +21,52 @@ def validar_link_youtube(url):
 def validar_link_spotify(url):
     return "open.spotify.com" in url
 
-# ============ FUNÇÕES OTIMIZADAS ============
+# ============ DOWNLOAD VIA API COBALT (YouTube - sem erro de bot) ============
+def baixar_youtube_api(url, qualidade="720", apenas_audio=False):
+    """Usa a API pública do cobalt para baixar do YouTube sem precisar de login"""
+    try:
+        api_url = "https://co.wuk.sh/api/json"
+        
+        payload = {
+            "url": url,
+            "vCodec": "h264",
+            "vQuality": qualidade,
+            "aFormat": "mp3",
+            "isAudioOnly": apenas_audio,
+            "filenamePattern": "basic"
+        }
+        
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.post(api_url, json=payload, headers=headers, timeout=30)
+        data = response.json()
+        
+        if data.get("status") == "stream" or data.get("status") == "redirect":
+            # Baixa o arquivo
+            file_url = data.get("url")
+            if file_url:
+                # Determina a extensão
+                ext = "mp3" if apenas_audio else "mp4"
+                pasta_temp = tempfile.mkdtemp()
+                arquivo_path = os.path.join(pasta_temp, f"video.{ext}")
+                
+                # Download do arquivo
+                file_response = requests.get(file_url, timeout=60, stream=True)
+                with open(arquivo_path, 'wb') as f:
+                    for chunk in file_response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+                
+                return arquivo_path, "download_sucesso"
+        
+        return None, data.get("text", "Erro na API")
+        
+    except Exception as e:
+        return None, str(e)
 
+# ============ DOWNLOAD INSTAGRAM (yt-dlp com login) ============
 def baixar_instagram(url):
     ydl_opts = {
         'outtmpl': '%(id)s.%(ext)s',
@@ -32,12 +74,9 @@ def baixar_instagram(url):
         'noplaylist': True,
         'quiet': True,
         'no_warnings': True,
-        'user_agent': USER_AGENT,
         'username': st.secrets.get("INSTAGRAM_USER", ""),
         'password': st.secrets.get("INSTAGRAM_PASS", ""),
-        # Otimizações de velocidade
-        'concurrent_fragment_downloads': 4,  # Baixa 4 fragmentos em paralelo
-        'buffersize': '1024K',
+        'concurrent_fragment_downloads': 4,
     }
     
     try:
@@ -48,55 +87,12 @@ def baixar_instagram(url):
     except Exception as e:
         return None, str(e)
 
-def baixar_youtube(url, pasta_temp, qualidade="Melhor qualidade"):
-    # Configurar formato baseado na qualidade
-    if qualidade == "Apenas áudio (MP3)":
-        format_str = 'bestaudio/best'
-    elif qualidade == "720p":
-        format_str = 'bestvideo[height<=720]+bestaudio/best[height<=720]/best[height<=720]'
-    elif qualidade == "480p":
-        format_str = 'bestvideo[height<=480]+bestaudio/best[height<=480]/best[height<=480]'
-    else:
-        format_str = 'best'
-    
-    ydl_opts = {
-        'outtmpl': os.path.join(pasta_temp, '%(title)s.%(ext)s'),
-        'format': format_str,
-        'noplaylist': True,
-        'quiet': True,
-        'no_warnings': True,
-        'user_agent': USER_AGENT,
-        'referer': 'https://www.youtube.com/',
-        # 🚀 OTIMIZAÇÕES DE VELOCIDADE
-        'concurrent_fragment_downloads': 4,  # Downloads paralelos
-        'buffersize': '2048K',  # Buffer maior
-        'http_chunk_size': '10485760',  # Chunk de 10MB
-        # Burla o throttle do YouTube (muito importante!)
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['web', 'web_creator', 'ios', 'android'],
-                'player_skip': ['webpage', 'configs']
-            }
-        },
-        'nocheckcertificate': True,
-        'retries': 3,
-        'fragment_retries': 3,
-    }
-    
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
-            return filename, info.get('title', 'vídeo')
-    except Exception as e:
-        return None, str(e)
-
+# ============ DOWNLOAD SPOTIFY (spotdl) ============
 def baixar_spotify(url, pasta_temp):
     try:
         process = subprocess.Popen(
             ['spotdl', url, '--output', pasta_temp, '--format', 'mp3', 
-             '--bitrate', '320',  # Qualidade máxima
-             '--threads', '4'],   # Threads paralelos
+             '--bitrate', '320', '--threads', '4'],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             cwd=pasta_temp
@@ -113,21 +109,13 @@ def baixar_spotify(url, pasta_temp):
     except Exception as e:
         return None, str(e)
 
-# ============ MANTER APP ACORDADO ============
-def manter_app_acordado():
-    """Faz um ping no próprio app para evitar que o Streamlit Cloud durma"""
-    try:
-        requests.get(st.runtime.get_instance()._server._base_url, timeout=5)
-    except:
-        pass
-
 # ============ INTERFACE ============
 st.title("🎵 Downloader Universal")
 st.markdown("Baixe vídeos e músicas de **Instagram**, **YouTube** e **Spotify** ⚡")
 
 # Menu de seleção
 plataforma = st.selectbox(
-    "📱 Escolha a plataforma:",
+    " Escolha a plataforma:",
     ["🎬 Instagram", "📺 YouTube", "🎵 Spotify"]
 )
 
@@ -138,10 +126,14 @@ url = st.text_input("🔗 Cole o link aqui:", placeholder="https://...")
 if "YouTube" in plataforma:
     qualidade = st.selectbox(
         "📺 Qualidade do vídeo:",
-        ["Melhor qualidade", "720p", "480p", "Apenas áudio (MP3)"]
+        ["1080p", "720p", "480p", "360p", "Apenas áudio (MP3)"]
     )
+    apenas_audio = qualidade == "Apenas áudio (MP3)"
+    qualidade_num = qualidade.replace("p", "") if not apenas_audio else "720"
 else:
     qualidade = "Melhor qualidade"
+    apenas_audio = False
+    qualidade_num = "720"
 
 # Botão de Download
 if st.button("⬇️ BAIXAR", type="primary", use_container_width=True):
@@ -150,7 +142,7 @@ if st.button("⬇️ BAIXAR", type="primary", use_container_width=True):
     else:
         inicio = time.time()
         
-        with st.spinner("🔄 Processando... Otimizando para máxima velocidade..."):
+        with st.spinner("🔄 Processando..."):
             pasta_temp = tempfile.mkdtemp()
             arquivo = None
             titulo = ""
@@ -158,7 +150,7 @@ if st.button("⬇️ BAIXAR", type="primary", use_container_width=True):
             
             if "Instagram" in plataforma:
                 if not validar_link_instagram(url):
-                    st.error(" Link inválido do Instagram!")
+                    st.error("❌ Link inválido do Instagram!")
                     st.stop()
                 arquivo, info = baixar_instagram(url)
                 if arquivo:
@@ -168,9 +160,9 @@ if st.button("⬇️ BAIXAR", type="primary", use_container_width=True):
                 if not validar_link_youtube(url):
                     st.error("❌ Link inválido do YouTube!")
                     st.stop()
-                arquivo, info = baixar_youtube(url, pasta_temp, qualidade)
+                arquivo, info = baixar_youtube_api(url, qualidade_num, apenas_audio)
                 if arquivo:
-                    titulo = info
+                    titulo = "Vídeo do YouTube"
                     
             elif "Spotify" in plataforma:
                 if not validar_link_spotify(url):
@@ -188,20 +180,23 @@ if st.button("⬇️ BAIXAR", type="primary", use_container_width=True):
                 st.success(f"✅ Download concluído em **{tempo_total} segundos**! ({tamanho_mb} MB)")
                 st.info(f"**Arquivo:** {titulo}")
                 
-                tipo_mime = "audio/mp3" if "Spotify" in plataforma or qualidade == "Apenas áudio (MP3)" else "video/mp4"
+                if "Spotify" in plataforma or apenas_audio:
+                    tipo_mime = "audio/mp3"
+                    extensao = ".mp3"
+                else:
+                    tipo_mime = "video/mp4"
+                    extensao = ".mp4"
                 
                 with open(arquivo, "rb") as f:
                     st.download_button(
-                        label=" Salvar arquivo",
+                        label="💾 Salvar arquivo",
                         data=f,
-                        file_name=os.path.basename(arquivo),
+                        file_name=f"download{extensao}",
                         mime=tipo_mime,
                         use_container_width=True
                     )
             else:
                 st.error(f"❌ Erro no download: {info}")
-                if "403" in str(info):
-                    st.error("🚫 O YouTube bloqueou o download. Tente novamente em alguns minutos.")
 
 # Rodapé
 st.markdown("---")
