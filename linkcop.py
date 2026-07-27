@@ -7,7 +7,10 @@ import subprocess
 import sys
 
 # Configuração da página
-st.set_page_config(page_title="Downloader Universal", page_icon="", layout="centered")
+st.set_page_config(page_title="Downloader Universal", page_icon="🎵", layout="centered")
+
+# Headers para evitar bloqueio do YouTube
+USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
 
 # Função para validar links
 def validar_link_instagram(url):
@@ -40,7 +43,7 @@ def baixar_instagram(url):
     except Exception as e:
         return None, str(e)
 
-# Função para baixar YouTube
+# Função para baixar YouTube (CORRIGIDA)
 def baixar_youtube(url, pasta_temp):
     ydl_opts = {
         'outtmpl': os.path.join(pasta_temp, '%(title)s.%(ext)s'),
@@ -48,20 +51,25 @@ def baixar_youtube(url, pasta_temp):
         'noplaylist': True,
         'quiet': True,
         'no_warnings': True,
+        # Headers para evitar bloqueio 403
+        'user_agent': USER_AGENT,
+        'referer': 'https://www.youtube.com/',
+        # Ignorar erros de geo-restriction
+        'ignoreerrors': False,
+        'extract_flat': False,
     }
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
-            return filename, info.get('title', 'video')
+            return filename, info.get('title', 'vídeo')
     except Exception as e:
         return None, str(e)
 
 # Função para baixar Spotify
 def baixar_spotify(url, pasta_temp):
     try:
-        # Executa o spotdl
         process = subprocess.Popen(
             ['spotdl', url, '--output', pasta_temp, '--format', 'mp3'],
             stdout=subprocess.PIPE,
@@ -71,7 +79,6 @@ def baixar_spotify(url, pasta_temp):
         stdout, stderr = process.communicate()
         
         if process.returncode == 0:
-            # Encontra o arquivo baixado
             arquivos = [f for f in os.listdir(pasta_temp) if f.endswith('.mp3')]
             if arquivos:
                 arquivo_path = os.path.join(pasta_temp, arquivos[0])
@@ -92,14 +99,23 @@ plataforma = st.selectbox(
 )
 
 # Campo de URL
-url = st.text_input(" Cole o link aqui:", placeholder="https://...")
+url = st.text_input("🔗 Cole o link aqui:", placeholder="https://...")
+
+# Opções adicionais para YouTube
+if "YouTube" in plataforma:
+    qualidade = st.selectbox(
+        "📺 Qualidade do vídeo:",
+        ["Melhor qualidade", "720p", "480p", "Apenas áudio (MP3)"]
+    )
+else:
+    qualidade = "Melhor qualidade"
 
 # Botão de Download
 if st.button("⬇️ BAIXAR", type="primary", use_container_width=True):
     if not url:
-        st.warning("️ Por favor, cole um link!")
+        st.warning("⚠️ Por favor, cole um link!")
     else:
-        with st.spinner("🔄 Processando download..."):
+        with st.spinner("🔄 Processando download... Aguarde..."):
             pasta_temp = tempfile.mkdtemp()
             arquivo = None
             titulo = ""
@@ -108,6 +124,7 @@ if st.button("⬇️ BAIXAR", type="primary", use_container_width=True):
                 if not validar_link_instagram(url):
                     st.error("❌ Link inválido do Instagram!")
                     st.stop()
+                st.info("🔄 Conectando ao Instagram...")
                 arquivo, info = baixar_instagram(url)
                 if arquivo:
                     titulo = info
@@ -116,14 +133,42 @@ if st.button("⬇️ BAIXAR", type="primary", use_container_width=True):
                 if not validar_link_youtube(url):
                     st.error("❌ Link inválido do YouTube!")
                     st.stop()
-                arquivo, info = baixar_youtube(url, pasta_temp)
-                if arquivo:
-                    titulo = info
+                
+                # Configurar qualidade
+                if qualidade == "Apenas áudio (MP3)":
+                    ydl_opts_teste = {'format': 'bestaudio/best'}
+                elif qualidade == "720p":
+                    ydl_opts_teste = {'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]'}
+                elif qualidade == "480p":
+                    ydl_opts_teste = {'format': 'bestvideo[height<=480]+bestaudio/best[height<=480]'}
+                else:
+                    ydl_opts_teste = {'format': 'best'}
+                
+                ydl_opts = {
+                    'outtmpl': os.path.join(pasta_temp, '%(title)s.%(ext)s'),
+                    'quiet': True,
+                    'no_warnings': True,
+                    'user_agent': USER_AGENT,
+                    'referer': 'https://www.youtube.com/',
+                    **ydl_opts_teste
+                }
+                
+                try:
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        info = ydl.extract_info(url, download=True)
+                        filename = ydl.prepare_filename(info)
+                        arquivo = filename
+                        titulo = info.get('title', 'vídeo')
+                except Exception as e:
+                    st.error(f"❌ Erro: {str(e)}")
+                    st.info(" **Dica:** O vídeo pode ser privado, ter restrição de idade ou de região.")
+                    st.stop()
                     
             elif "Spotify" in plataforma:
                 if not validar_link_spotify(url):
                     st.error("❌ Link inválido do Spotify!")
                     st.stop()
+                st.info("🎵 Processando com SpotDL...")
                 arquivo, info = baixar_spotify(url, pasta_temp)
                 if arquivo:
                     titulo = info
@@ -133,16 +178,21 @@ if st.button("⬇️ BAIXAR", type="primary", use_container_width=True):
                 st.success("✅ Download concluído!")
                 st.info(f"**Arquivo:** {titulo}")
                 
+                # Determinar tipo de arquivo
+                tipo_mime = "audio/mp3" if "Spotify" in plataforma or qualidade == "Apenas áudio (MP3)" else "video/mp4"
+                
                 with open(arquivo, "rb") as f:
                     st.download_button(
-                        label="💾 Salvar arquivo",
+                        label=" Salvar arquivo",
                         data=f,
                         file_name=os.path.basename(arquivo),
-                        mime="audio/mp3" if "Spotify" in plataforma else "video/mp4",
+                        mime=tipo_mime,
                         use_container_width=True
                     )
-            else:
-                st.error(f"❌ Erro no download: {info if 'info' in locals() else 'Erro desconhecido'}")
+            elif arquivo is None:
+                st.error(f"❌ Erro no download: {info}")
+                if "403" in str(info):
+                    st.error("🚫 O YouTube bloqueou o download. Tente novamente em alguns minutos.")
 
 # Rodapé
 st.markdown("---")
