@@ -3,11 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>InstaSave Pro - Baixar Vídeos do Instagram</title>
+    <title>InstaSave Pro</title>
+    
+    <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#dc2743">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="InstaSave Pro">
+    <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="icon" type="image/png" href="icon-192.png">
     
@@ -66,11 +69,6 @@
             transform: translateY(-3px);
             box-shadow: 0 15px 40px rgba(0,0,0,0.4);
         }
-        .btn-secondary {
-            background: rgba(255,255,255,0.2);
-            color: white;
-            border: 2px solid white;
-        }
         .instructions {
             margin-top: 40px;
             background: rgba(255,255,255,0.15);
@@ -116,11 +114,11 @@
         </a>
         
         <div class="instructions">
-            <h3>📲 Como Instalar no seu Dispositivo:</h3>
+            <h3>📲 Como Instalar:</h3>
             <ul>
-                <li><span class="emoji">📱</span><strong>Android:</strong> Menu Chrome (⋮) → "Adicionar à tela inicial"</li>
+                <li><span class="emoji">📱</span><strong>Android:</strong> Menu Chrome (⋮) → "Instalar e criar atalho"</li>
                 <li><span class="emoji">🍎</span><strong>iPhone:</strong> Compartilhar → "Adicionar à Tela de Início"</li>
-                <li><span class="emoji">💻</span><strong>Windows:</strong> Menu Chrome → "Criar atalho" → Marque "Abrir como janela"</li>
+                <li><span class="emoji">💻</span><strong>Windows:</strong> Menu Chrome → "Criar atalho" → "Abrir como janela"</li>
                 <li><span class="emoji">🍏</span><strong>Mac:</strong> Arquivo → "Adicionar ao Dock"</li>
             </ul>
         </div>
@@ -130,5 +128,14 @@
             <p style="margin-top: 10px;">Feito com ❤️ | InstaSave Pro © 2026</p>
         </div>
     </div>
+
+    <script>
+        // Registrar Service Worker para PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('data:text/javascript,').then(() => {
+                console.log('SW registrado');
+            });
+        }
+    </script>
 </body>
 </html>
