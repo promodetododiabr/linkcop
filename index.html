@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InstaSave Pro</title>
+    <meta name="theme-color" content="#dc2743">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="InstaSave Pro">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="icon" type="image/png" href="icon-192.png">
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: white;
+            text-align: center;
+        }
+        .container {
+            padding: 40px;
+        }
+        .logo {
+            font-size: 80px;
+            margin-bottom: 20px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 800;
+        }
+        p {
+            font-size: 1.2em;
+            opacity: 0.9;
+            margin-bottom: 30px;
+        }
+        .btn {
+            display: inline-block;
+            background: white;
+            color: #dc2743;
+            padding: 18px 50px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.2em;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+        }
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+        .instructions {
+            margin-top: 40px;
+            background: rgba(255,255,255,0.15);
+            padding: 20px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .instructions h3 {
+            margin-bottom: 15px;
+        }
+        .instructions ul {
+            list-style: none;
+            text-align: left;
+        }
+        .instructions li {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        .instructions li:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">📸</div>
+        <h1>InstaSave Pro</h1>
+        <p>Baixe vídeos, reels e fotos do Instagram</p>
+        
+        <a href="https://linkcop-videsomp3.streamlit.app/" class="btn">
+            🚀 ABRIR APP
+        </a>
+        
+        <div class="instructions">
+            <h3> Instalar no seu dispositivo:</h3>
+            <ul>
+                <li>📱 <strong>Android:</strong> Menu Chrome → "Adicionar à tela inicial"</li>
+                <li>🍎 <strong>iPhone:</strong> Compartilhar → "Adicionar à Tela de Início"</li>
+                <li> <strong>Windows:</strong> Menu Chrome → "Criar atalho" → "Abrir como janela"</li>
+                <li> <strong>Mac:</strong> Arquivo → "Adicionar ao Dock"</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        // Redirecionamento automático após 3 segundos (opcional)
+        setTimeout(() => {
+            if (confirm('Deseja abrir o InstaSave Pro agora?')) {
+                window.location.href = 'https://linkcop-videsomp3.streamlit.app/';
+            }
+        }, 5000);
+    </script>
+</body>
+</html>
